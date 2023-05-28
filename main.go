@@ -69,16 +69,23 @@ func whepHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	answer, whepSessionId, err := webrtc.WHEP(string(offer), streamKey)
-	if err != nil {
-		logHTTPError(res, err.Error(), http.StatusBadRequest)
-		return
-	}
+	if (req.Method == "PATCH") {
+		vals := strings.Split(req.URL.RequestURI(), "/")
+		whepSessionId := vals[len(vals)-1]
+		webrtc.WHEPAddICECandidate(offer, streamKey, whepSessionId)
+		fmt.Fprint(res, "")
+	} else {
+		answer, whepSessionId, err := webrtc.WHEP(string(offer), streamKey)
+		if err != nil {
+			logHTTPError(res, err.Error(), http.StatusBadRequest)
+			return
+		}
 
-	apiPath := req.Host + strings.TrimSuffix(req.URL.RequestURI(), "whep")
-	res.Header().Add("Link", `<`+apiPath+"sse/"+whepSessionId+`>; rel="urn:ietf:params:whep:ext:core:server-sent-events"; events="layers"`)
-	res.Header().Add("Link", `<`+apiPath+"layer/"+whepSessionId+`>; rel="urn:ietf:params:whep:ext:core:layer"`)
-	fmt.Fprint(res, answer)
+		apiPath := req.Host + strings.TrimSuffix(req.URL.RequestURI(), "whep")
+		res.Header().Add("Link", `<`+apiPath+"sse/"+whepSessionId+`>; rel="urn:ietf:params:whep:ext:core:server-sent-events"; events="layers"`)
+		res.Header().Add("Link", `<`+apiPath+"layer/"+whepSessionId+`>; rel="urn:ietf:params:whep:ext:core:layer"`)
+		fmt.Fprint(res, answer)
+	}
 }
 
 func whepServerSentEventsHandler(res http.ResponseWriter, req *http.Request) {

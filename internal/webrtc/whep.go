@@ -15,6 +15,7 @@ import (
 
 type (
 	whepSession struct {
+		peerConnection *webrtc.PeerConnection
 		videoTrack     *webrtc.TrackLocalStaticRTP
 		currentLayer   atomic.Value
 		sequenceNumber uint16
@@ -151,11 +152,29 @@ func WHEP(offer, streamKey string) (string, string, error) {
 	defer stream.whepSessionsLock.Unlock()
 
 	stream.whepSessions[whepSessionId] = &whepSession{
+		peerConnection: peerConnection,
 		videoTrack: videoTrack,
 		timestamp:  50000,
 	}
 	stream.whepSessions[whepSessionId].currentLayer.Store("")
 	return peerConnection.LocalDescription().SDP, whepSessionId, nil
+}
+
+func WHEPAddICECandidate(iceCandidate []byte, streamKey string, whepSessionId string) {
+	var (
+		candidate webrtc.ICECandidateInit
+	)
+	if (json.Unmarshal(iceCandidate[:], &candidate) == nil) {
+		for streamKey := range streamMap {
+			streamMap[streamKey].whepSessionsLock.Lock()
+			defer streamMap[streamKey].whepSessionsLock.Unlock()
+
+			if _, ok := streamMap[streamKey].whepSessions[whepSessionId]; ok {
+				streamMap[streamKey].whepSessions[whepSessionId].peerConnection.AddICECandidate(candidate)
+				break
+			}
+		}
+	}
 }
 
 func (w *whepSession) sendVideoPacket(rtpPkt *rtp.Packet, layer string, timeDiff uint32) {
